@@ -1,0 +1,11 @@
+schema_version = "0.1.0"
+id = "blender_phantasm"
+version = "0.1.0"
+name = "Phantasm"
+tagline = "Automated asset validation and pipeline sanity checks."
+maintainer = "Alexander Nollet"
+type = "add-on"
+tags = ["3D View", "Mesh", "Pipeline"]
+blender_version_min = "4.2.0"
+license = ["GPL-3.0-or-later"]
+website = "https://github.com/Alikznollet/blender-phantasm"
