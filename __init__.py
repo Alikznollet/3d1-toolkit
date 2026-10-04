@@ -70,10 +70,6 @@ def register():
   if phantasm_live_check not in bpy.app.handlers.depsgraph_update_post:
     bpy.app.handlers.depsgraph_update_post.append(phantasm_live_check)
 
-  # Run it manually once on startup to populate the cache immediately
-  if bpy.context.evaluated_depsgraph_get():
-      phantasm_live_check(None, bpy.context.evaluated_depsgraph_get())
-
 def unregister():
   print("Phantasm has been unloaded from Blender.")
   for cls in classes:
