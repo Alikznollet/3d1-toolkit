@@ -1,5 +1,6 @@
 import bpy
 import bmesh
+import bpy.props
 
 report_cache = {
   "ran_once": False,
@@ -72,6 +73,30 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 
 		return {"FINISHED"}
 
+class DAE_OT_SelectAsset(bpy.types.Operator):
+	bl_idname = "dae.select_asset"
+	bl_label = "Select Asset"
+
+	asset_name: bpy.props.StringProperty()
+
+	def execute(self, context):
+		if context.active_object and context.active_object.mode != "OBJECT":
+			bpy.ops.object.mode_set(mode="OBJECT")
+
+		# Deselect all previous objects
+		bpy.ops.object.select_all(action="DESELECT")
+
+		# Select the object if one exists.
+		obj = bpy.data.objects.get(self.asset_name)
+		if obj:
+			obj.select_set(True)
+			context.view_layer.objects.active = obj
+		else:
+			self.report({"ERROR"}, "Object no longer exists. Try re-running the check.")
+			return {"CANCELLED"}
+
+		return {"FINISHED"}
+
 # 3. THE UI PANEL
 class DAE_PT_PreFlightPanel(bpy.types.Panel):
 	bl_space_type = 'VIEW_3D'
@@ -99,7 +124,7 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 				box = layout.box()
 				box.label(text="Missing 'SM_' Prefix:", icon='ERROR')
 				for n in report_cache["naming"]: 
-					box.label(text=n)
+					box.operator("dae.select_asset", text=n, icon='VIEWZOOM').asset_name = n
 					
 			# Display Material Errors
 			if report_cache["materials"]:
@@ -113,26 +138,27 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 				box = layout.box()
 				box.label(text="Contains N-Gons:", icon='ERROR')
 				for g in report_cache["ngons"]: 
-					box.label(text=g)
+					box.operator("dae.select_asset", text=g, icon='VIEWZOOM').asset_name = g
 
 			# Display Non-Manifolds Errors
 			if report_cache["non-manifolds"]:
 				box = layout.box()
 				box.label(text="Contains Non-Manifolds:", icon='ERROR')
-				for g in report_cache["non-manifolds"]: 
-						box.label(text=g)
+				for nm in report_cache["non-manifolds"]: 
+					box.operator("dae.select_asset", text=nm, icon='VIEWZOOM').asset_name = nm
 
 			# Display Overlapping Geometry Errors
 			if report_cache["overlapping"]:
 				box = layout.box()
 				box.label(text="Overlapping Verts/Faces:", icon='ERROR')
 				for ov in report_cache["overlapping"]: 
-					box.label(text=ov)
+					box.operator("dae.select_asset", text=ov, icon='VIEWZOOM').asset_name = ov
 
 # 4. REGISTRATION
 classes = (
-    DAE_OT_RunChecks,
-    DAE_PT_PreFlightPanel,
+	DAE_OT_RunChecks,
+	DAE_OT_SelectAsset,
+	DAE_PT_PreFlightPanel,
 )
 
 def register():
