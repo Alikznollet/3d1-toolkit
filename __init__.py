@@ -6,7 +6,8 @@ report_cache = {
 	"naming": [],
 	"materials": [],
 	"ngons": [],
-	"non-manifolds": []
+	"non-manifolds": [],
+	"overlapping": [],
 }
 
 class DAE_OT_RunChecks(bpy.types.Operator):
@@ -22,6 +23,7 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 		report_cache["materials"].clear()
 		report_cache["ngons"].clear()
 		report_cache["non-manifolds"].clear()
+		report_cache["overlapping"].clear()
 
 		# Scan Objects
 		for obj in bpy.context.scene.objects:
@@ -45,13 +47,23 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 						report_cache["non-manifolds"].append(obj.name)
 						break
 
+				# Check for overlapping edges.
+				original_vert_count = len(bm.verts)
+
+				# Run a merge by distance on the copied mesh.
+				bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0001)
+
+				# If the count went down there's overlapping vertices.
+				if len(bm.verts) < original_vert_count:
+					report_cache["overlapping"].append(obj.name)
+
 				# Delete the bmesh
 				bm.free()
 
 		# Scan Materials
 		for mat in bpy.data.materials:
 			if not mat.name.startswith("M_") and not mat.name.startswith("Dots"):
-				report_cache["naming"].append(mat.name)
+				report_cache["materials"].append(mat.name)
 
 		# Redraw UI
 		for area in context.screen.areas:
@@ -109,6 +121,13 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 				box.label(text="Contains Non-Manifolds:", icon='ERROR')
 				for g in report_cache["non-manifolds"]: 
 						box.label(text=g)
+
+			# Display Overlapping Geometry Errors
+			if report_cache["overlapping"]:
+				box = layout.box()
+				box.label(text="Overlapping Verts/Faces:", icon='ERROR')
+				for ov in report_cache["overlapping"]: 
+					box.label(text=ov)
 
 # 4. REGISTRATION
 classes = (
