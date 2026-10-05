@@ -1,11 +1,11 @@
 schema_version = "0.1.0"
-id = "blender_phantasm"
+id = "dae_3d1_pre_flight"
 version = "0.1.0"
-name = "Phantasm"
-tagline = "Automated asset validation and pipeline sanity checks."
+name = "DAE Pre-Flight"
+tagline = "Single-click scene validation for DAE 3D1 assignments."
 maintainer = "Alexander Nollet"
 type = "add-on"
-tags = ["3D View", "Mesh", "Pipeline"]
+tags = ["3D View", "Mesh"]
 blender_version_min = "4.2.0"
 license = ["GPL-3.0-or-later"]
-website = "https://github.com/Alikznollet/blender-phantasm"
+website = "https://github.com/Alikznollet/dae-3d1-pre-flight"

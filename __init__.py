@@ -1,79 +1,125 @@
 import bpy
-from bpy.app.handlers import persistent
+import bmesh
 
-phantasm_cache = {
-  "bad_meshes": [],
-  "bad_materials": []
+report_cache = {
+  "ran_once": False,
+	"naming": [],
+	"materials": [],
+	"ngons": [],
+	"non-manifolds": []
 }
 
-@persistent
-def phantasm_live_check(check, depsgraph):
-  if depsgraph.id_type_updated("OBJECT") or depsgraph.id_type_updated("MATERIAL"):
-    phantasm_cache["bad_meshes"].clear()
-    phantasm_cache["bad_materials"].clear()
+class DAE_OT_RunChecks(bpy.types.Operator):
+	bl_idname = "dae.run_pre_flight"
+	bl_label = "Run Pre-Flight Checks"
+	bl_description = "Scans the entire scene for assignment requirements."
 
-    # Scan for bad meshes
-    for obj in bpy.data.objects:
-        if obj.type == 'MESH' and not obj.name.startswith("SM_"):
-            phantasm_cache["bad_meshes"].append(obj.name)
+	def execute(self, context): 
+		report_cache["ran_once"] = True
+		
+		# Clear the cache
+		report_cache["naming"].clear()
+		report_cache["materials"].clear()
+		report_cache["ngons"].clear()
+		report_cache["non-manifolds"].clear()
 
-    # Scan for bad materials
-    for mat in bpy.data.materials:
-        if not mat.name.startswith("M_") and not mat.name.startswith("Dots"):
-            phantasm_cache["bad_materials"].append(mat.name)
+		# Scan Objects
+		for obj in bpy.context.scene.objects:
+			if obj.type == "MESH":
+				# Check the Prefix
+				if not obj.name.startswith("SM_"):
+					report_cache["naming"].append(obj.name)
 
-    # Force the UI to refresh immediately
-    for area in bpy.context.screen.areas:
-        if area.type == 'VIEW_3D':
-            area.tag_redraw()
+				# We'll copy the mesh.
+				bm = bmesh.new()
+				bm.from_mesh(obj.data)
 
-class PHANTASM_PT_MainPanel(bpy.types.Panel):
-  bl_space_type = "VIEW_3D"
-  bl_region_type = "UI"
-  bl_category = "Phantasm"
-  bl_label = "Asset validation"
+				# Check for n-gons too.
+				if any(len(p.vertices) > 4 for p in obj.data.polygons):
+					report_cache["ngons"].append(obj.name)
 
-  def draw(self, context):
-    layout = self.layout
-    
-    # Read from our cache
-    bad_meshes = phantasm_cache["bad_meshes"]
-    bad_mats = phantasm_cache["bad_materials"]
-    
-    # Mesh UI
-    mesh_box = layout.box()
-    mesh_box.label(text="Invalid Meshes:", icon='MESH_DATA')
-    if not bad_meshes:
-        mesh_box.label(text="All Good!", icon='CHECKMARK')
-    else:
-        for name in bad_meshes:
-            mesh_box.label(text=name, icon='CANCEL')
+				# Check for non-manifolds.
+				for edge in bm.edges:
+					# Flag edges that have no faces or more than 2.
+					if not edge.is_manifold and not edge.is_boundary:
+						report_cache["non-manifolds"].append(obj.name)
+						break
 
-    # Material UI
-    mat_box = layout.box()
-    mat_box.label(text="Invalid Materials:", icon='MATERIAL')
-    if not bad_mats:
-        mat_box.label(text="All Good!", icon='CHECKMARK')
-    else:
-        for name in bad_mats:
-            mat_box.label(text=name, icon='CANCEL')
+				# Delete the bmesh
+				bm.free()
 
+		# Scan Materials
+		for mat in bpy.data.materials:
+			if not mat.name.startswith("M_") and not mat.name.startswith("Dots"):
+				report_cache["naming"].append(mat.name)
+
+		# Redraw UI
+		for area in context.screen.areas:
+			if area.type == "VIEW_3D":
+				area.tag_redraw()
+
+		return {"FINISHED"}
+
+# 3. THE UI PANEL
+class DAE_PT_PreFlightPanel(bpy.types.Panel):
+	bl_space_type = 'VIEW_3D'
+	bl_region_type = 'UI'
+	bl_category = 'Pre-Flight'
+	bl_label = "DAE 3D1 Validation"
+	
+	def draw(self, context):
+		layout = self.layout
+		
+		# The Main Button
+		layout.operator("dae.run_pre_flight", text="Run All Checks", icon='PLAY')
+		
+		# Only show results if the button has been clicked at least once
+		if report_cache["ran_once"]:
+			layout.separator()
+			
+			# Check if all lists are empty (meaning everything passed)
+			if not report_cache["naming"] and not report_cache["materials"] and not report_cache["ngons"]:
+				layout.label(text="Scene Passed! Ready for export.", icon='FILE_TICK')
+				return
+					
+			# Display Mesh Name Errors
+			if report_cache["naming"]:
+				box = layout.box()
+				box.label(text="Missing 'SM_' Prefix:", icon='ERROR')
+				for n in report_cache["naming"]: 
+					box.label(text=n)
+					
+			# Display Material Errors
+			if report_cache["materials"]:
+				box = layout.box()
+				box.label(text="Missing 'M_' Prefix:", icon='ERROR')
+				for m in report_cache["materials"]: 
+					box.label(text=m)
+					
+			# Display N-Gon Errors
+			if report_cache["ngons"]:
+				box = layout.box()
+				box.label(text="Contains N-Gons:", icon='ERROR')
+				for g in report_cache["ngons"]: 
+					box.label(text=g)
+
+			# Display Non-Manifolds Errors
+			if report_cache["non-manifolds"]:
+				box = layout.box()
+				box.label(text="Contains Non-Manifolds:", icon='ERROR')
+				for g in report_cache["non-manifolds"]: 
+						box.label(text=g)
+
+# 4. REGISTRATION
 classes = (
-  PHANTASM_PT_MainPanel,
+    DAE_OT_RunChecks,
+    DAE_PT_PreFlightPanel,
 )
 
 def register():
-  print("Phantasm has been loaded into Blender.")
-  for cls in classes:
-    bpy.utils.register_class(cls)
-
-  if phantasm_live_check not in bpy.app.handlers.depsgraph_update_post:
-    bpy.app.handlers.depsgraph_update_post.append(phantasm_live_check)
+	for cls in classes:
+		bpy.utils.register_class(cls)
 
 def unregister():
-  print("Phantasm has been unloaded from Blender.")
-  for cls in classes:
-    bpy.utils.unregister_class(cls)
-
-  if phantasm_live_check in bpy.app.handlers.depsgraph_update_post:
-      bpy.app.handlers.depsgraph_update_post.remove(phantasm_live_check)
+	for cls in reversed(classes):
+		bpy.utils.unregister_class(cls)
