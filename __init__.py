@@ -146,7 +146,6 @@ class DAE_OT_SelectMaterial(bpy.types.Operator):
 
 		return {"FINISHED"}
 
-# 3. THE UI PANEL
 class DAE_PT_PreFlightPanel(bpy.types.Panel):
 	bl_space_type = 'VIEW_3D'
 	bl_region_type = 'UI'
@@ -160,50 +159,54 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 		layout.operator("dae.run_pre_flight", text="Run All Checks", icon='PLAY')
 		
 		# Only show results if the button has been clicked at least once
-		if report_cache["ran_once"]:
+		if report_cache.get("ran_once"):
 			layout.separator()
 			
 			# Check if all lists are empty (meaning everything passed)
-			if not report_cache["naming"] and not report_cache["materials"] and not report_cache["ngons"]:
-				layout.label(text="Scene Passed! Ready for export.", icon='FILE_TICK')
+			if not report_cache["naming"] and not report_cache["materials"] and not report_cache["ngons"] and not report_cache["non-manifolds"] and not report_cache["overlapping"]:
+				layout.label(text="Scene Passed!", icon='CHECKMARK')
 				return
 					
 			# Display Mesh Name Errors
 			if report_cache["naming"]:
 				box = layout.box()
 				box.label(text="Missing 'SM_' Prefix:", icon='ERROR')
+				col = box.column(align=True)
 				for n in report_cache["naming"]: 
-					box.operator("dae.select_asset", text=n, icon='VIEWZOOM').asset_name = n
+					col.operator("dae.select_asset", text=n, icon='OUTLINER_OB_MESH').asset_name = n
 					
 			# Display Material Errors
 			if report_cache["materials"]:
 				box = layout.box()
 				box.label(text="Missing 'M_' Prefix:", icon='ERROR')
+				col = box.column(align=True)
 				for m in report_cache["materials"]: 
-					box.operator("dae.select_material", text=m, icon='VIEWZOOM').mat_name = m
+					col.operator("dae.select_material", text=m, icon='MATERIAL').mat_name = m
 					
 			# Display N-Gon Errors
 			if report_cache["ngons"]:
 				box = layout.box()
 				box.label(text="Contains N-Gons:", icon='ERROR')
+				col = box.column(align=True)
 				for g in report_cache["ngons"]: 
-					box.operator("dae.select_asset", text=g, icon='VIEWZOOM').asset_name = g
+					col.operator("dae.select_asset", text=g, icon='MESH_DATA').asset_name = g
 
 			# Display Non-Manifolds Errors
 			if report_cache["non-manifolds"]:
 				box = layout.box()
 				box.label(text="Contains Non-Manifolds:", icon='ERROR')
+				col = box.column(align=True)
 				for nm in report_cache["non-manifolds"]: 
-					box.operator("dae.select_asset", text=nm, icon='VIEWZOOM').asset_name = nm
+					col.operator("dae.select_asset", text=nm, icon='MOD_WIREFRAME').asset_name = nm
 
 			# Display Overlapping Geometry Errors
 			if report_cache["overlapping"]:
 				box = layout.box()
 				box.label(text="Overlapping Verts/Faces:", icon='ERROR')
+				col = box.column(align=True)
 				for ov in report_cache["overlapping"]: 
-					box.operator("dae.select_asset", text=ov, icon='VIEWZOOM').asset_name = ov
+					col.operator("dae.select_asset", text=ov, icon='UV_VERTEX').asset_name = ov
 
-# 4. REGISTRATION
 classes = (
 	DAE_OT_RunChecks,
 	DAE_OT_SelectAsset,
