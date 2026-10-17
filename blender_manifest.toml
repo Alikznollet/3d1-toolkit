@@ -1,6 +1,6 @@
 schema_version = "0.1.0"
 id = "dae_3d1_pre_flight"
-version = "0.1.0"
+version = "0.1.1"
 name = "DAE Pre-Flight"
 tagline = "Single-click scene validation for DAE 3D1 assignments."
 maintainer = "Alexander Nollet"
