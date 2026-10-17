@@ -178,6 +178,7 @@ class DAE_OT_SelectMaterial(bpy.types.Operator):
 		return {"FINISHED"}
 
 class DAE_PT_PreFlightPanel(bpy.types.Panel):
+	bl_idname = "DAE_PT_PreFlightPanel"
 	bl_space_type = 'VIEW_3D'
 	bl_region_type = 'UI'
 	bl_category = 'Pre-Flight'
@@ -192,14 +193,11 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 		# Only show results if the button has been clicked at least once
 		if ran_once:
 			layout.separator()
-			
-			# Check if all lists are empty (meaning everything passed)
-			if not report_cache["naming"] and not report_cache["materials"] and not report_cache["ngons"] and not report_cache["non-manifolds"] and not report_cache["overlapping"]:
-				layout.label(text="Scene Passed!", icon='CHECKMARK')
-				return
-					
+			valid = True
+		
 			# Display Mesh Name Errors
 			if report_cache["naming"]:
+				valid = False
 				box = layout.box()
 				box.label(text="Missing 'SM_' Prefix:", icon='ERROR')
 				col = box.column(align=True)
@@ -208,6 +206,7 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 
 			# Display unapplied modifiers
 			if report_cache["modifiers"]:
+				valid = False
 				box = layout.box()
 				box.label(text="Unapplied Modifiers:", icon='ERROR')
 				col = box.column(align=True)
@@ -216,6 +215,7 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 					
 			# Display N-Gon Errors
 			if report_cache["ngons"]:
+				valid = False
 				box = layout.box()
 				box.label(text="Contains N-Gons:", icon='ERROR')
 				col = box.column(align=True)
@@ -224,6 +224,7 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 
 			# Display Non-Manifolds Errors
 			if report_cache["non-manifolds"]:
+				valid = False
 				box = layout.box()
 				box.label(text="Contains Non-Manifolds:", icon='ERROR')
 				col = box.column(align=True)
@@ -232,6 +233,7 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 
 			# Display Overlapping Geometry Errors
 			if report_cache["overlapping"]:
+				valid = False
 				box = layout.box()
 				box.label(text="Overlapping Verts/Faces:", icon='ERROR')
 				col = box.column(align=True)
@@ -240,35 +242,50 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 
 			# Display Material Errors
 			if report_cache["materials"]:
+				valid = False
 				box = layout.box()
 				box.label(text="Missing 'M_' Prefix:", icon='ERROR')
 				col = box.column(align=True)
 				for m in report_cache["materials"]: 
 					col.operator("dae.select_material", text=m, icon='MATERIAL').mat_name = m
 
+			# The next few are specific to unused textures or psd imports
+
+			if report_cache.get("unused_mats") or report_cache.get("unused_images") or report_cache.get("psd_images"):
+				layout.separator()
+				layout.label(text="Data Cleanup Required:", icon='ORPHAN_DATA')
+
 			# Unused Materials
 			if report_cache.get("unused_mats"):
-					box = layout.box()
-					box.label(text="Unused Materials (0 Users):", icon='TRASH')
-					col = box.column(align=True)
-					for um in report_cache["unused_mats"]:
-							col.label(text=um, icon='MATERIAL')
+				valid = False
+				box = layout.box()
+				box.label(text="Unused Materials:", icon='TRASH')
+				col = box.column(align=True)
+				for um in report_cache["unused_mats"]:
+					col.label(text=um, icon='MATERIAL')
 
 			# Unused Textures
 			if report_cache.get("unused_images"):
-					box = layout.box()
-					box.label(text="Unused Textures (0 Users):", icon='TRASH')
-					col = box.column(align=True)
-					for ui in report_cache["unused_images"]:
-							col.label(text=ui, icon='IMAGE_DATA')
+				valid = False
+				box = layout.box()
+				box.label(text="Unused Textures:", icon='TRASH')
+				col = box.column(align=True)
+				for ui in report_cache["unused_images"]:
+					col.label(text=ui, icon='IMAGE_DATA')
 
 			# PSD Files Still in Use
 			if report_cache.get("psd_images"):
-					box = layout.box()
-					box.label(text="PSD Textures Found (Convert to PNG/TGA):", icon='CANCEL')
-					col = box.column(align=True)
-					for psd in report_cache["psd_images"]:
-							col.label(text=psd, icon='FILE_IMAGE')
+				valid = False
+				box = layout.box()
+				box.label(text="PSD Textures Found:", icon='CANCEL')
+				col = box.column(align=True)
+				for psd in report_cache["psd_images"]:
+					col.label(text=psd, icon='FILE_IMAGE')
+
+			# Check if all lists are empty (meaning everything passed)
+			if valid:
+				layout.label(text="Scene Passed! Time to export!", icon='CHECKMARK')
+				return
 
 classes = (
 	DAE_OT_RunChecks,
