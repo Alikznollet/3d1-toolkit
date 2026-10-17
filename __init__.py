@@ -102,6 +102,8 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 			if area.type == "VIEW_3D":
 				area.tag_redraw()
 
+		bpy.ops.dae.pre_flight_popup("INVOKE_DEFAULT")
+
 		return {"FINISHED"}
 
 class DAE_OT_SelectAsset(bpy.types.Operator):
@@ -177,127 +179,156 @@ class DAE_OT_SelectMaterial(bpy.types.Operator):
 
 		return {"FINISHED"}
 
-class DAE_PT_PreFlightPanel(bpy.types.Panel):
-	bl_idname = "DAE_PT_PreFlightPanel"
-	bl_space_type = 'VIEW_3D'
-	bl_region_type = 'UI'
-	bl_category = 'Pre-Flight'
+class DAE_OT_PreFlightPopup(bpy.types.Operator):
+	bl_idname = "dae.pre_flight_popup"
 	bl_label = "DAE 3D1 Validation"
+	
+	def invoke(self, context, event):
+		return context.window_manager.invoke_popup(self, width=280)
+		
+	def execute(self, context):
+		return {'FINISHED'}
 	
 	def draw(self, context):
 		layout = self.layout
+		layout.label(text="Is your asset ready?")
 		
-		# The Main Button
-		layout.operator("dae.run_pre_flight", text="Run All Checks", icon='PLAY')
-		
-		# Only show results if the button has been clicked at least once
-		if ran_once:
+		if all(not report_cache[key] for key in KEYS):
+			box = layout.box()
+			box.label(text="Yes it is! Time to export!", icon='CHECKMARK')
+			return
+
+		#
+		# NAMING
+		#
+
+		# Add a label for naming issues.
+		if report_cache.get("naming") or report_cache.get("materials"):
 			layout.separator()
-			valid = True
-		
-			# Display Mesh Name Errors
-			if report_cache["naming"]:
-				valid = False
-				box = layout.box()
-				box.label(text="Missing 'SM_' Prefix:", icon='ERROR')
-				col = box.column(align=True)
-				for n in report_cache["naming"]: 
-					col.operator("dae.select_asset", text=n, icon='OUTLINER_OB_MESH').asset_name = n
+			layout.label(text="Naming Issues:", icon='INFO')
+			
+		# Display Mesh Name Errors
+		if report_cache["naming"]:
+			box = layout.box()
+			box.label(text="Missing 'SM_' Prefix:", icon='ERROR')
+			col = box.column(align=True)
+			for n in report_cache["naming"]: 
+				col.operator("dae.select_asset", text=n, icon='OUTLINER_OB_MESH').asset_name = n
 
-			# Display unapplied modifiers
-			if report_cache["modifiers"]:
-				valid = False
-				box = layout.box()
-				box.label(text="Unapplied Modifiers:", icon='ERROR')
-				col = box.column(align=True)
-				for m in report_cache["modifiers"]: 
-					col.operator("dae.select_asset", text=m, icon='MODIFIER_DATA').asset_name = m
-					
-			# Display N-Gon Errors
-			if report_cache["ngons"]:
-				valid = False
-				box = layout.box()
-				box.label(text="Contains N-Gons:", icon='ERROR')
-				col = box.column(align=True)
-				for g in report_cache["ngons"]: 
-					col.operator("dae.select_asset", text=g, icon='MESH_DATA').asset_name = g
+		# Display Material Errors
+		if report_cache["materials"]:
+			box = layout.box()
+			box.label(text="Missing 'M_' Prefix:", icon='ERROR')
+			col = box.column(align=True)
+			for m in report_cache["materials"]: 
+				col.operator("dae.select_material", text=m, icon='MATERIAL').mat_name = m
 
-			# Display Non-Manifolds Errors
-			if report_cache["non-manifolds"]:
-				valid = False
-				box = layout.box()
-				box.label(text="Contains Non-Manifolds:", icon='ERROR')
-				col = box.column(align=True)
-				for nm in report_cache["non-manifolds"]: 
-					col.operator("dae.select_asset", text=nm, icon='MOD_WIREFRAME').asset_name = nm
+		#
+		# MESHES
+		#
 
-			# Display Overlapping Geometry Errors
-			if report_cache["overlapping"]:
-				valid = False
-				box = layout.box()
-				box.label(text="Overlapping Verts/Faces:", icon='ERROR')
-				col = box.column(align=True)
-				for ov in report_cache["overlapping"]: 
-					col.operator("dae.select_asset", text=ov, icon='UV_VERTEX').asset_name = ov
+		# Add a label for mesh issues.
+		if report_cache.get("modifiers") or report_cache.get("ngons") or report_cache.get("non-manifolds") or report_cache.get("overlapping"):
+			layout.separator()
+			layout.label(text="Mesh Issues:", icon='INFO')
 
-			# Display Material Errors
-			if report_cache["materials"]:
-				valid = False
-				box = layout.box()
-				box.label(text="Missing 'M_' Prefix:", icon='ERROR')
-				col = box.column(align=True)
-				for m in report_cache["materials"]: 
-					col.operator("dae.select_material", text=m, icon='MATERIAL').mat_name = m
+		# Display unapplied modifiers
+		if report_cache["modifiers"]:
+			box = layout.box()
+			box.label(text="Unapplied Modifiers:", icon='ERROR')
+			col = box.column(align=True)
+			for m in report_cache["modifiers"]: 
+				col.operator("dae.select_asset", text=m, icon='MODIFIER_DATA').asset_name = m
+				
+		# Display N-Gon Errors
+		if report_cache["ngons"]:
+			box = layout.box()
+			box.label(text="Contains N-Gons:", icon='ERROR')
+			col = box.column(align=True)
+			for g in report_cache["ngons"]: 
+				col.operator("dae.select_asset", text=g, icon='MESH_DATA').asset_name = g
 
-			# The next few are specific to unused textures or psd imports
+		# Display Non-Manifolds Errors
+		if report_cache["non-manifolds"]:
+			box = layout.box()
+			box.label(text="Contains Non-Manifolds:", icon='ERROR')
+			col = box.column(align=True)
+			for nm in report_cache["non-manifolds"]: 
+				col.operator("dae.select_asset", text=nm, icon='MOD_WIREFRAME').asset_name = nm
 
-			if report_cache.get("unused_mats") or report_cache.get("unused_images") or report_cache.get("psd_images"):
-				layout.separator()
-				layout.label(text="Data Cleanup Required:", icon='ORPHAN_DATA')
+		# Display Overlapping Geometry Errors
+		if report_cache["overlapping"]:
+			box = layout.box()
+			box.label(text="Overlapping Verts/Faces:", icon='ERROR')
+			col = box.column(align=True)
+			for ov in report_cache["overlapping"]: 
+				col.operator("dae.select_asset", text=ov, icon='UV_VERTEX').asset_name = ov
 
-			# Unused Materials
-			if report_cache.get("unused_mats"):
-				valid = False
-				box = layout.box()
-				box.label(text="Unused Materials:", icon='TRASH')
-				col = box.column(align=True)
-				for um in report_cache["unused_mats"]:
-					col.label(text=um, icon='MATERIAL')
+		#
+		# Data cleanup
+		#
 
-			# Unused Textures
-			if report_cache.get("unused_images"):
-				valid = False
-				box = layout.box()
-				box.label(text="Unused Textures:", icon='TRASH')
-				col = box.column(align=True)
-				for ui in report_cache["unused_images"]:
-					col.label(text=ui, icon='IMAGE_DATA')
+		# --- Data Cleanup Section ---
+		if report_cache.get("unused_mats") or report_cache.get("unused_images") or report_cache.get("psd_images"):
+			layout.separator()
+			layout.label(text="Clean Up Your Data:", icon='ORPHAN_DATA')
 
-			# PSD Files Still in Use
-			if report_cache.get("psd_images"):
-				valid = False
-				box = layout.box()
-				box.label(text="PSD Textures Found:", icon='CANCEL')
-				col = box.column(align=True)
-				for psd in report_cache["psd_images"]:
-					col.label(text=psd, icon='FILE_IMAGE')
+		# Unused Materials
+		if report_cache.get("unused_mats"):
+			box = layout.box()
+			box.label(text="Unused Materials:", icon='TRASH')
+			col = box.column(align=True)
+			for um in report_cache["unused_mats"]:
+				col.label(text=um, icon='MATERIAL')
 
-			# Check if all lists are empty (meaning everything passed)
-			if valid:
-				layout.label(text="Scene Passed! Time to export!", icon='CHECKMARK')
-				return
+		# Unused Textures
+		if report_cache.get("unused_images"):
+			box = layout.box()
+			box.label(text="Unused Textures:", icon='TRASH')
+			col = box.column(align=True)
+			for ui in report_cache["unused_images"]:
+				col.label(text=ui, icon='IMAGE_DATA')
+
+		# PSD Files Still in Use
+		if report_cache.get("psd_images"):
+			box = layout.box()
+			box.label(text="PSD Textures Found:", icon='CANCEL')
+			col = box.column(align=True)
+			for psd in report_cache["psd_images"]:
+				col.label(text=psd, icon='FILE_IMAGE')
 
 classes = (
 	DAE_OT_RunChecks,
 	DAE_OT_SelectAsset,
 	DAE_OT_SelectMaterial,
-	DAE_PT_PreFlightPanel,
+	DAE_OT_PreFlightPopup,
 )
+
+addon_keymaps = []
 
 def register():
 	for cls in classes:
 		bpy.utils.register_class(cls)
 
+	# Set up hotkey
+	wm = bpy.context.window_manager
+	kc = wm.keyconfigs.addon
+	if kc:
+		km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
+		kmi = km.keymap_items.new("dae.run_pre_flight", type="V", value="PRESS", ctrl=True, shift=True)
+		addon_keymaps.append((km, kmi))
+
 def unregister():
 	for cls in reversed(classes):
 		bpy.utils.unregister_class(cls)
+
+	# Remove hotkey
+	wm = bpy.context.window_manager
+	kc = wm.keyconfigs.addon
+	if kc:
+		for km, kmi in addon_keymaps:
+			km.keymap_items.remove(kmi)
+	addon_keymaps.clear()
+
+if __name__ == "__main__":
+	register()
