@@ -3,12 +3,13 @@ import bmesh
 import bpy.props
 
 report_cache = {
-  "ran_once": False,
+	"ran_once": False,
 	"naming": [],
 	"materials": [],
 	"ngons": [],
 	"non-manifolds": [],
 	"overlapping": [],
+	"modifiers": [],
 }
 
 class DAE_OT_RunChecks(bpy.types.Operator):
@@ -25,6 +26,7 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 		report_cache["ngons"].clear()
 		report_cache["non-manifolds"].clear()
 		report_cache["overlapping"].clear()
+		report_cache["modifiers"].clear()
 
 		# Scan Objects
 		for obj in bpy.context.scene.objects:
@@ -32,6 +34,10 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 				# Check the Prefix
 				if not obj.name.startswith("SM_"):
 					report_cache["naming"].append(obj.name)
+
+				# Check if there are any modifiers still not applied.
+				if len(obj.modifiers) > 0:
+					report_cache["modifiers"].append(obj.name)
 
 				# We'll copy the mesh.
 				bm = bmesh.new()
@@ -174,6 +180,14 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 				col = box.column(align=True)
 				for n in report_cache["naming"]: 
 					col.operator("dae.select_asset", text=n, icon='OUTLINER_OB_MESH').asset_name = n
+
+			# Display unapplied modifiers
+			if report_cache["modifiers"]:
+				box = layout.box()
+				box.label(text="Unapplied Modifiers:", icon='ERROR')
+				col = box.column(align=True)
+				for m in report_cache["modifiers"]: 
+					col.operator("dae.select_asset", text=m, icon='MODIFIER_DATA').asset_name = m
 					
 			# Display Material Errors
 			if report_cache["materials"]:
