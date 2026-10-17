@@ -2,15 +2,21 @@ import bpy
 import bmesh
 import bpy.props
 
-report_cache = {
-	"ran_once": False,
-	"naming": [],
-	"materials": [],
-	"ngons": [],
-	"non-manifolds": [],
-	"overlapping": [],
-	"modifiers": [],
-}
+KEYS: list[str] = [
+	"naming",
+	"materials",
+	"ngons",
+	"non-manifolds",
+	"overlapping",
+	"modifiers",
+	"unused_mats",
+	"unused_images",
+	"psd_images",
+]
+
+# Whether the checks have been ran once before.
+ran_once: bool = False
+report_cache = {} # Dynamic dict of values
 
 class DAE_OT_RunChecks(bpy.types.Operator):
 	bl_idname = "dae.run_pre_flight"
@@ -18,15 +24,14 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 	bl_description = "Scans the entire scene for assignment requirements."
 
 	def execute(self, context): 
-		report_cache["ran_once"] = True
-		
-		# Clear the cache
-		report_cache["naming"].clear()
-		report_cache["materials"].clear()
-		report_cache["ngons"].clear()
-		report_cache["non-manifolds"].clear()
-		report_cache["overlapping"].clear()
-		report_cache["modifiers"].clear()
+		global ran_once
+		ran_once = True
+
+		# Clear and initialize the cache
+		for key in KEYS:
+			if key not in report_cache:
+				report_cache[key] = []
+			report_cache[key].clear()
 
 		# Scan Objects
 		for obj in bpy.context.scene.objects:
@@ -69,8 +74,28 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 
 		# Scan Materials
 		for mat in bpy.data.materials:
+			# Check for material naming.
 			if not mat.name.startswith("M_") and not mat.name.startswith("Dots"):
 				report_cache["materials"].append(mat.name)
+
+			# Check if the material even has users.
+			if mat.users == 0:
+				report_cache["unused_mats"].append(mat.name)
+
+		# Scan the textures/images
+		for img in bpy.data.images:
+			# Ignore blender internals
+			if img.type != "IMAGE" or img.source != "FILE":
+				continue
+
+			# Check for unused ones.
+			if img.users == 0:
+				report_cache["unused_images"].append(img.name)
+
+			# Check for psd format
+			filepath = img.filepath.lower()
+			if filepath.endswith(".psd") or img.name.lower().endswith(".psd"):
+				report_cache["psd_images"].append(img.name)
 
 		# Redraw UI
 		for area in context.screen.areas:
@@ -165,7 +190,7 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 		layout.operator("dae.run_pre_flight", text="Run All Checks", icon='PLAY')
 		
 		# Only show results if the button has been clicked at least once
-		if report_cache.get("ran_once"):
+		if ran_once:
 			layout.separator()
 			
 			# Check if all lists are empty (meaning everything passed)
@@ -188,14 +213,6 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 				col = box.column(align=True)
 				for m in report_cache["modifiers"]: 
 					col.operator("dae.select_asset", text=m, icon='MODIFIER_DATA').asset_name = m
-					
-			# Display Material Errors
-			if report_cache["materials"]:
-				box = layout.box()
-				box.label(text="Missing 'M_' Prefix:", icon='ERROR')
-				col = box.column(align=True)
-				for m in report_cache["materials"]: 
-					col.operator("dae.select_material", text=m, icon='MATERIAL').mat_name = m
 					
 			# Display N-Gon Errors
 			if report_cache["ngons"]:
@@ -220,6 +237,38 @@ class DAE_PT_PreFlightPanel(bpy.types.Panel):
 				col = box.column(align=True)
 				for ov in report_cache["overlapping"]: 
 					col.operator("dae.select_asset", text=ov, icon='UV_VERTEX').asset_name = ov
+
+			# Display Material Errors
+			if report_cache["materials"]:
+				box = layout.box()
+				box.label(text="Missing 'M_' Prefix:", icon='ERROR')
+				col = box.column(align=True)
+				for m in report_cache["materials"]: 
+					col.operator("dae.select_material", text=m, icon='MATERIAL').mat_name = m
+
+			# Unused Materials
+			if report_cache.get("unused_mats"):
+					box = layout.box()
+					box.label(text="Unused Materials (0 Users):", icon='TRASH')
+					col = box.column(align=True)
+					for um in report_cache["unused_mats"]:
+							col.label(text=um, icon='MATERIAL')
+
+			# Unused Textures
+			if report_cache.get("unused_images"):
+					box = layout.box()
+					box.label(text="Unused Textures (0 Users):", icon='TRASH')
+					col = box.column(align=True)
+					for ui in report_cache["unused_images"]:
+							col.label(text=ui, icon='IMAGE_DATA')
+
+			# PSD Files Still in Use
+			if report_cache.get("psd_images"):
+					box = layout.box()
+					box.label(text="PSD Textures Found (Convert to PNG/TGA):", icon='CANCEL')
+					col = box.column(align=True)
+					for psd in report_cache["psd_images"]:
+							col.label(text=psd, icon='FILE_IMAGE')
 
 classes = (
 	DAE_OT_RunChecks,
