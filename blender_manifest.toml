@@ -1,8 +1,8 @@
 schema_version = "0.1.0"
-id = "dae_3d1_pre_flight"
-version = "0.1.1"
-name = "DAE Pre-Flight"
-tagline = "Single-click scene validation for DAE 3D1 assignments."
+id = "alikz_3d1_essentials"
+version = "0.1.2"
+name = "Alikz' 3D1 Essentials"
+tagline = "A Bundle of tools aimed at making the 3D workflow faster. (specifically for 3D1)"
 maintainer = "Alexander Nollet"
 type = "add-on"
 tags = ["3D View", "Mesh"]
