@@ -100,17 +100,13 @@ class DAE_OT_SanityCheckPopup(bpy.types.Operator):
 				for node in mat.node_tree.nodes:
 					if node.type == "TEX_IMAGE" and node.image:
 						used_textures.add(node.image)
-						print(f"used {node.image}")
 
 		# Scan the textures/images
 		for texture in bpy.data.images:
-			print(f"{texture} scanned")
-			print(f"{texture.type}{texture.source}")
 			# Ignore blender internals	
 			if texture.type not in ("IMAGE", "UV_TEST") or texture.source not in ("FILE", "GENERATED"):
 				continue
 
-			print(f"{texture} passed first check")
 			# Check for unused ones.
 			if texture not in used_textures:
 				report_cache[Check.UNUSED_TEXTURES].append(texture.name)
