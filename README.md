@@ -10,6 +10,15 @@ This repository contains a bundle of tools tailored to making aspects of the **3
 > [!CAUTION]
 > These tools are only to be used for the 3D1 course, since I cannot guarantee conventions in other courses will be the same.
 
+## 📥 Installation
+
+1. Navigate to the **[Releases](../../releases)** section on the right side of this repository.
+2. Download the latest `Alikz-3D1-Toolkit.zip` file from the Assets section. *(Do not extract it!)*
+3. Open Blender and go to `Edit > Preferences > Add-ons`.
+4. Click the **Install...** button in the top right corner.
+5. Locate your downloaded `.zip` file and click **Install Add-on**.
+6. Check the box next to **3D View: Alikz' 3D1 Toolkit** to enable it!
+
 ## 🔧 Tools Overview
 
 ### **Sanity Checker (CTRL + SHIFT + V)**
