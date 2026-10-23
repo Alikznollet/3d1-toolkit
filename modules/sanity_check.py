@@ -7,7 +7,7 @@ class Check(Enum):
 	MATERIAL_NAMING = ("M_ Prefix", "dae.select_material", "MATERIAL")
 	NGONS = ("N-Gons", "dae.select_object", "MESH_DATA")
 	NON_MANIFOLDS = ("Non-Manifolds", "dae.select_object", "MOD_WIREFRAME")
-	OVERLAPPING_GEOMETRY = ("Overlapping Geometry", "dae.select_object", "UV_VERTEX")
+	OVERLAPPING_GEOMETRY = ("Overlapping Geometry", "dae.select_object", "OVERLAY")
 	UNAPPLIED_MODIFIERS = ("Unapplied Modifiers", "dae.select_object", "MODIFIER_DATA")
 	UNUSED_MATERIALS = ("Unused Materials", "", "MATERIAL")
 	UNUSED_TEXTURES = ("Unused Textures", "", "IMAGE_DATA")
@@ -29,14 +29,14 @@ CATEGORIES: dict[Category, list[Check]] = {
 ran_once: bool = False
 report_cache: dict[Check, list[str]] = {} # Dynamic dict of values
 
-class DAE_OT_RunChecks(bpy.types.Operator):
-	bl_idname = "dae.run_pre_flight"
-	bl_label = "Run Pre-Flight Checks"
-	bl_description = "Scans the entire scene for assignment requirements."
+class DAE_OT_SanityCheckPopup(bpy.types.Operator):
+	bl_idname = "dae.run_sanity_check"
+	bl_label = "DAE 3D1 Sanity Checker"
 
-	def execute(self, context): 
-		global ran_once
-		ran_once = True
+	def invoke(self, context, event): 
+		# Force into object mode so edits are applied
+		if context.active_object and context.active_object.mode != "OBJECT":
+			bpy.ops.object.mode_set(mode="OBJECT")
 
 		# Clear and initialize the cache
 		for cat in CATEGORIES:
@@ -85,6 +85,7 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 				bm.free()
 
 		# Scan Materials
+		used_textures = set()
 		for mat in bpy.data.materials:
 			# Check for material naming.
 			if not mat.name.startswith("M_") and not mat.name.startswith("Dots"):
@@ -94,29 +95,63 @@ class DAE_OT_RunChecks(bpy.types.Operator):
 			if mat.users == 0:
 				report_cache[Check.UNUSED_MATERIALS].append(mat.name)
 
+			# We check for textures so we can determine unused textures later.
+			if mat.use_nodes:
+				for node in mat.node_tree.nodes:
+					if node.type == "TEX_IMAGE" and node.image:
+						used_textures.add(node.image)
+						print(f"used {node.image}")
+
 		# Scan the textures/images
-		for img in bpy.data.images:
-			# Ignore blender internals
-			if img.type != "IMAGE" or img.source != "FILE":
+		for texture in bpy.data.images:
+			print(f"{texture} scanned")
+			print(f"{texture.type}{texture.source}")
+			# Ignore blender internals	
+			if texture.type not in ("IMAGE", "UV_TEST") or texture.source not in ("FILE", "GENERATED"):
 				continue
 
+			print(f"{texture} passed first check")
 			# Check for unused ones.
-			if img.users == 0:
-				report_cache[Check.UNUSED_TEXTURES].append(img.name)
+			if texture not in used_textures:
+				report_cache[Check.UNUSED_TEXTURES].append(texture.name)
 
 			# Check for psd format
-			filepath = img.filepath.lower()
-			if filepath.endswith(".psd") or img.name.lower().endswith(".psd"):
-				report_cache[Check.PSD_TEXTURES].append(img.name)
+			filepath = texture.filepath.lower()
+			if filepath.endswith(".psd") or texture.name.lower().endswith(".psd"):
+				report_cache[Check.PSD_TEXTURES].append(texture.name)
 
-		# Redraw UI
-		for area in context.screen.areas:
-			if area.type == "VIEW_3D":
-				area.tag_redraw()
+		return context.window_manager.invoke_popup(self, width=280)
 
-		bpy.ops.dae.pre_flight_popup("INVOKE_DEFAULT")
-
+	def execute(self, context):
 		return {"FINISHED"}
+
+	def draw(self, context):
+		layout = self.layout
+		layout.label(text="Is your asset ready?")
+
+		for cat in CATEGORIES:
+			checks: list[Check] = CATEGORIES[cat]
+
+			# Add the category label
+			layout.separator()
+			layout.label(text=f"{cat.value}", icon="INFO")
+
+			# Loop over all of the checks in a category
+			for check in checks:
+				box = layout.box()
+
+				# Check if that check has issues. If not tell the user the check passed.
+				if report_cache[check]:
+					box.label(text=f"{check.value[0]}:", icon="ERROR")
+					col = box.column(align=True)
+					for report in report_cache[check]:
+						if check.value[1] != "":
+							op = col.operator(check.value[1], text=report, icon=check.value[2])
+							op.target = report
+						else:
+							col.label(text=report, icon=check.value[2])
+				else:
+					box.label(text=f"{check.value[0]}: Passed", icon="CHECKMARK")
 
 class DAE_OT_SelectObject(bpy.types.Operator):
 	bl_idname = "dae.select_object"
@@ -191,49 +226,10 @@ class DAE_OT_SelectMaterial(bpy.types.Operator):
 
 		return {"FINISHED"}
 
-class DAE_OT_PreFlightPopup(bpy.types.Operator):
-	bl_idname = "dae.pre_flight_popup"
-	bl_label = "DAE 3D1 Sanity Checker"
-	
-	def invoke(self, context, event):
-		return context.window_manager.invoke_popup(self, width=280)
-		
-	def execute(self, context):
-		return {'FINISHED'}
-	
-	def draw(self, context):
-		layout = self.layout
-		layout.label(text="Is your asset ready?")
-
-		for cat in CATEGORIES:
-			checks: list[Check] = CATEGORIES[cat]
-
-			# Add the category label
-			layout.separator()
-			layout.label(text=f"{cat.value}", icon="INFO")
-
-			# Loop over all of the checks in a category
-			for check in checks:
-				box = layout.box()
-
-				# Check if that check has issues. If not tell the user the check passed.
-				if report_cache[check]:
-					box.label(text=f"{check.value[0]}:", icon="ERROR")
-					col = box.column(align=True)
-					for report in report_cache[check]:
-						if check.value[1] != "":
-							op = col.operator(check.value[1], text=report, icon=check.value[2])
-							op.target = report
-						else:
-							col.label(text=report, icon=check.value[2])
-				else:
-					box.label(text=f"{check.value[0]}: Passed", icon="CHECKMARK")
-
 classes = (
-    DAE_OT_RunChecks,
+	DAE_OT_SanityCheckPopup,
     DAE_OT_SelectObject,
     DAE_OT_SelectMaterial,
-    DAE_OT_PreFlightPopup,
 )
 
 def register():

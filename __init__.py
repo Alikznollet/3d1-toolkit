@@ -23,7 +23,7 @@ def register():
         km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
         
         # Validation Hotkey (Ctrl + Shift + V)
-        kmi_validate = km.keymap_items.new("dae.run_pre_flight", type="V", value="PRESS", ctrl=True, shift=True)
+        kmi_validate = km.keymap_items.new("dae.run_sanity_check", type="V", value="PRESS", ctrl=True, shift=True)
         addon_keymaps.append((km, kmi_validate))
         
         # Blueprint Hotkey (Ctrl + Shift + B)
