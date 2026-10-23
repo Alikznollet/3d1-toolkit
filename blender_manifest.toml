@@ -1,8 +1,8 @@
-schema_version = "0.1.0"
-id = "alikz_3d1_essentials"
-version = "0.1.2"
-name = "Alikz' 3D1 Essentials"
-tagline = "A Bundle of tools aimed at making the 3D workflow faster. (specifically for 3D1)"
+schema_version = "1.0.0"
+id = "alikz_3d1_toolkit"
+version = "1.0.0"
+name = "Alikz' 3D1 Toolkit"
+tagline = "A bundle of tools tailored to making aspects of the 3D1 workflow faster, less tedious and less stressful."
 maintainer = "Alexander Nollet"
 type = "add-on"
 tags = ["3D View", "Mesh"]
