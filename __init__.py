@@ -1,10 +1,10 @@
 # Module imports.
 if "bpy" in locals():
     import importlib
-    importlib.reload(pre_flight)
+    importlib.reload(sanity_check)
     importlib.reload(blueprints)
 else:
-    from .modules import pre_flight
+    from .modules import sanity_check
     from .modules import blueprints
 
 import bpy
@@ -13,7 +13,7 @@ addon_keymaps = []
 
 def register():
     # Register the sub-modules
-    pre_flight.register()
+    sanity_check.register()
     blueprints.register()
     
     # Set up all hotkeys centrally
@@ -40,7 +40,7 @@ def unregister():
     addon_keymaps.clear()
     
     # Unregister the sub-modules
-    pre_flight.unregister()
+    sanity_check.unregister()
     blueprints.unregister()
 
 if __name__ == "__main__":

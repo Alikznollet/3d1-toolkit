@@ -3,10 +3,10 @@ import math
 import os
 
 class DAE_OT_ImportBlueprints(bpy.types.Operator):
-	bl_idname = "dae.import_blueprints"
-	bl_label = "Generate Blueprint Setup"
-	bl_description = "Upload images to automatically generate aligned blueprint planes"
-	bl_options = {'REGISTER', 'UNDO'}
+	bl_idname: str = "dae.import_blueprints"
+	bl_label: str = "Generate Blueprint Setup"
+	bl_description: str = "Upload images to automatically generate aligned blueprint planes"
+	bl_options: set[str] = {'REGISTER', 'UNDO'}
 
 	# These properties create the file browser inputs in the popup
 	filepath_front: bpy.props.StringProperty(name="Front View", subtype='FILE_PATH')
@@ -107,7 +107,8 @@ class DAE_OT_ImportBlueprints(bpy.types.Operator):
 			# Add the texture.
 			tex_node = mat.node_tree.nodes.new('ShaderNodeTexImage')
 			tex_node.image = img
-			
+
+			# Link up the shader nodes.
 			mat.node_tree.links.new(tex_node.outputs['Color'], bsdf.inputs['Base Color'])
 			plane.data.materials.append(mat)
 
