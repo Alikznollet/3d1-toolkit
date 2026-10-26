@@ -23,6 +23,9 @@ This repository contains a bundle of tools tailored to making aspects of the **3
 
 ### **Sanity Checker (CTRL + SHIFT + V)**
 
+> [!IMPORTANT]
+> **Context is key.** As the artist, you ALWAYS have the final say in what you produce. This tool highlights potential issues, but do not blindly follow its output if a flagged item is intentional for your workflow.
+
 Press the keybind anywhere inside the **3D Viewport** to instantly run a full sanity check on your scene.
 
 <br>
