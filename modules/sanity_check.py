@@ -74,18 +74,50 @@ class DAE_OT_SanityCheckPopup(bpy.types.Operator):
 				# Check for overlapping edges.
 				original_vert_count = len(bm.verts)
 
-				# Run a merge by distance on the copied mesh.
-				bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0001)
+				# Group all islands into islands first to separate each linked object.
+				unvisited = set(bm.verts)
+				islands = []
 
-				# If the count went down there's overlapping vertices.
+				while unvisited:
+					start_vert = unvisited.pop()
+					island_verts = [start_vert]
+					stack = [start_vert]
+
+					while stack:
+						current_vert = stack.pop()
+						for edge in current_vert.link_edges:
+							linked_vert = edge.other_vert(current_vert)
+							if linked_vert in unvisited:
+								unvisited.remove(linked_vert)
+								island_verts.append(linked_vert)
+								stack.append(linked_vert)
+
+					islands.append(island_verts)
+
+				# Remove doubles within each island separately.
+				for island in islands:
+					valid_verts = [v for v in island if v.is_valid]
+					if len(valid_verts) > 1:
+						bmesh.ops.remove_doubles(bm, verts=valid_verts, dist=0.0001)
+
+				# Finally check if the vertex count went down.
 				if len(bm.verts) < original_vert_count:
 					report_cache[Check.OVERLAPPING_GEOMETRY].append(obj.name)
 
 				# Delete the bmesh
 				bm.free()
 
-		# Scan Materials
+		# We'll crawl all materials to get used textures.
 		used_textures = set()
+		def _find_images(node_tree):
+			if not node_tree: return
+			for node in node_tree.nodes:
+				if node.type in ("TEX_IMAGE", "TEX_ENVIRONMENT") and node.image:
+					used_textures.add(node.image)
+				elif node.type == "GROUP" and node.node_tree:
+					_find_images(node.node_tree)
+
+		# Scan Materials
 		for mat in bpy.data.materials:
 			# Check for material naming.
 			if not mat.name.startswith("M_") and not mat.name.startswith("Dots"):
@@ -95,11 +127,8 @@ class DAE_OT_SanityCheckPopup(bpy.types.Operator):
 			if mat.users == 0:
 				report_cache[Check.UNUSED_MATERIALS].append(mat.name)
 
-			# We check for textures so we can determine unused textures later.
 			if mat.use_nodes:
-				for node in mat.node_tree.nodes:
-					if node.type == "TEX_IMAGE" and node.image:
-						used_textures.add(node.image)
+				_find_images(mat.node_tree)
 
 		# Scan the textures/images
 		for texture in bpy.data.images:

@@ -53,7 +53,7 @@ class DAE_OT_ImportBlueprints(bpy.types.Operator):
 		]
 
 		# Create a new collection for the blueprints or get the existing one.
-		if "Blueprints" not in bpy.data.collections:
+		if "BP" not in bpy.data.collections:
 			bp_collection = bpy.data.collections.new("BP")
 			bpy.context.scene.collection.children.link(bp_collection)
 		else:
