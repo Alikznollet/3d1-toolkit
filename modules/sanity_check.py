@@ -107,8 +107,17 @@ class DAE_OT_SanityCheckPopup(bpy.types.Operator):
 				# Delete the bmesh
 				bm.free()
 
-		# Scan Materials
+		# We'll crawl all materials to get used textures.
 		used_textures = set()
+		def _find_images(node_tree):
+			if not node_tree: return
+			for node in node_tree.nodes:
+				if node.type in ("TEX_IMAGE", "TEX_ENVIRONMENT") and node.image:
+					used_textures.add(node.image)
+				elif node.type == "GROUP" and node.node_tree:
+					_find_images(node.node_tree)
+
+		# Scan Materials
 		for mat in bpy.data.materials:
 			# Check for material naming.
 			if not mat.name.startswith("M_") and not mat.name.startswith("Dots"):
@@ -118,11 +127,8 @@ class DAE_OT_SanityCheckPopup(bpy.types.Operator):
 			if mat.users == 0:
 				report_cache[Check.UNUSED_MATERIALS].append(mat.name)
 
-			# We check for textures so we can determine unused textures later.
 			if mat.use_nodes:
-				for node in mat.node_tree.nodes:
-					if node.type == "TEX_IMAGE" and node.image:
-						used_textures.add(node.image)
+				_find_images(mat.node_tree)
 
 		# Scan the textures/images
 		for texture in bpy.data.images:
